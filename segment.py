@@ -428,7 +428,7 @@ def test(eval_data_loader, model, num_classes,
     prev_pred = ''
     for iter, (image, label, name) in enumerate(eval_data_loader):
         data_time.update(time.time() - end)
-        if iter % 10 == 0:
+        if iter % 2 == 0:
             image_var = Variable(image, requires_grad=False, volatile=True)
             final = model(image_var)[0]
             _, pred = torch.max(final, 1)
