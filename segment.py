@@ -425,12 +425,16 @@ def test(eval_data_loader, model, num_classes,
     data_time = AverageMeter()
     end = time.time()
     hist = np.zeros((num_classes, num_classes))
+    prev_pred = ''
     for iter, (image, label, name) in enumerate(eval_data_loader):
         data_time.update(time.time() - end)
-        image_var = Variable(image, requires_grad=False, volatile=True)
-        final = model(image_var)[0]
-        _, pred = torch.max(final, 1)
-        pred = pred.cpu().data.numpy()
+        if iter % 10 == 0:
+            image_var = Variable(image, requires_grad=False, volatile=True)
+            final = model(image_var)[0]
+            _, pred = torch.max(final, 1)
+            pred = pred.cpu().data.numpy()
+        else:
+            pred = prev_pred
         batch_time.update(time.time() - end)
         if save_vis:
             save_output_images(pred, name, output_dir)
@@ -442,6 +446,7 @@ def test(eval_data_loader, model, num_classes,
             print('===> mAP {mAP:.3f}'.format(
                 mAP=round(np.nanmean(per_class_iu(hist)) * 100, 2)))
         end = time.time()
+        prev_pred = pred
         print('Eval: [{0}/{1}]\t'
               'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
               'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
