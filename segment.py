@@ -25,6 +25,8 @@ from torch.autograd import Variable
 import drn
 import data_transforms as transforms
 
+import pdb
+import pickle
 
 CITYSCAPE_PALLETE = np.asarray([
     [128, 64, 128],
@@ -434,7 +436,44 @@ def test(eval_data_loader, model, num_classes,
             _, pred = torch.max(final, 1)
             pred = pred.cpu().data.numpy()
         else:
-            pred = prev_pred
+            mv = pickle.load(open('moon_setting.pkl', 'rb'))
+            mv = np.transpose(mv, (0, 3, 1, 2))
+            # blow up mv array in x,y dim
+            mv = np.repeat(mv, image.shape[2] / mv.shape[2], axis=2)
+            mv = np.repeat(mv, image.shape[3] / mv.shape[3], axis=3)
+            # pad mv array to image size
+            mvP = np.zeros((mv.shape[0], mv.shape[1], image.shape[2], image.shape[3]), dtype=mv.dtype)
+            mvP[:mv.shape[0], :mv.shape[1], :mv.shape[2], :mv.shape[3]] = mv
+            mv = mvP
+            # init new pred array, iter
+            pred = prev_pred.copy()
+            it = np.nditer(pred, flags=['multi_index'], op_flags=['writeonly'])
+            while not it.finished:
+                # get curr pos (x,y)
+                ind = it.multi_index
+                x = ind[1]
+                y = ind[2]
+                # extract mv at (x,y)
+                mv_x = mv[iter - 1][0][x][y]
+                mv_y = mv[iter - 1][1][x][y]
+                # compute src class pos (new_x, new_y)
+                new_x = x - int(mv_x)
+                new_y = y - int(mv_y)
+                # enforce bounds on (new_x, new_y)
+                if new_x < 0:
+                    new_x = 0
+                if new_x >= pred.shape[1]:
+                    new_x = pred.shape[1] - 1
+                if new_y < 0:
+                    new_y = 0
+                if new_y >= pred.shape[2]:
+                    new_y = pred.shape[2] - 1
+                # set class at (x, y)
+                it[0] = prev_pred[0][new_x][new_y]
+                # print("(%d, %d) (%d, %d)" % (x, y, mv_x, mv_y))
+                # print("%d %d <%s>\n" % (prev_pred[0][x][y], it[0], it.multi_index))
+                it.iternext()
+            # pdb.set_trace()
         batch_time.update(time.time() - end)
         if save_vis:
             save_output_images(pred, name, output_dir)
