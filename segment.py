@@ -429,14 +429,11 @@ def test(eval_data_loader, model, num_classes,
     # load mvs
     mv = pickle.load(open('moon_setting.pkl', 'rb'))
     mv = np.transpose(mv, (0, 3, 1, 2))
-    # blow up mv array in x,y dim
-    image, label, name = first(eval_data_loader)
-    mv = np.repeat(mv, image.shape[2] / mv.shape[2], axis=2)
-    mv = np.repeat(mv, image.shape[3] / mv.shape[3], axis=3)
-    # pad mv array to image size
-    mvP = np.zeros((mv.shape[0], mv.shape[1], image.shape[2], image.shape[3]), dtype=mv.dtype)
-    mvP[:mv.shape[0], :mv.shape[1], :mv.shape[2], :mv.shape[3]] = mv
-    mv = mvP
+    # calc image:mv dim ratio
+    image, _, _ = first(eval_data_loader)
+    r = image.shape[2] // mv.shape[2]
+    print(" mv.shape %s" % (mv.shape,))
+    print("img.shape %s" % (image.shape,))
     # start timing
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -449,44 +446,55 @@ def test(eval_data_loader, model, num_classes,
             final = model(image_var)[0]
             _, pred = torch.max(final, 1)
             pred = pred.cpu().data.numpy()
+            if iter == 0:
+                print(" pd.shape %s" % (pred.shape,))
         else:
             # init new pred array, iter
             st_c = time.time()
             pred = prev_pred.copy()
             print("copy time %.3f" % (time.time() - st_c))
-            it = np.nditer(pred, flags=['multi_index'], op_flags=['writeonly'])
+            mv_iter = np.nditer(mv[iter - 1][0], flags=['multi_index'], op_flags=['readonly'])
             st_l = time.time()
             ctr = 0
             iter_time = AverageMeter()
-            while not it.finished:
+            while not mv_iter.finished:
                 st_i = time.time()
                 ctr += 1
                 # get curr pos (x,y)
-                ind = it.multi_index
-                x = ind[1]
-                y = ind[2]
+                ind = mv_iter.multi_index
+                x = ind[0]
+                y = ind[1]
                 # extract mv at (x,y)
-                mv_x = mv[iter - 1][0][x][y]
-                mv_y = mv[iter - 1][1][x][y]
+                mv_x = int(mv[iter - 1][0][x][y])
+                mv_y = int(mv[iter - 1][1][x][y])
                 # compute src class pos (new_x, new_y)
-                new_x = x - int(mv_x)
-                new_y = y - int(mv_y)
+                new_x = x - mv_x
+                new_y = y - mv_y
                 # enforce bounds on (new_x, new_y)
                 if new_x < 0:
                     new_x = 0
-                elif new_x >= pred.shape[1]:
-                    new_x = pred.shape[1] - 1
+                elif new_x >= mv.shape[2]:
+                    new_x = mv.shape[2] - 1
                 if new_y < 0:
                     new_y = 0
-                elif new_y >= pred.shape[2]:
-                    new_y = pred.shape[2] - 1
+                elif new_y >= mv.shape[3]:
+                    new_y = mv.shape[3] - 1
                 # set class at (x, y)
-                it[0] = prev_pred[0][new_x][new_y]
-                # print("(%d, %d) (%d, %d)" % (x, y, mv_x, mv_y))
-                # print("%d %d <%s>\n" % (prev_pred[0][x][y], it[0], it.multi_index))
-                it.iternext()
+                d_l_x = r * x
+                d_u_x = r * (x+1)
+                d_l_y = r * y
+                d_u_y = r * (y+1)
+                s_l_x = r * new_x
+                s_u_x = r * (new_x+1)
+                s_l_y = r * new_y
+                s_u_y = r * (new_y+1)
+                # print("dest  x=[%d %d] y=[%d %d]" % (d_l_x, d_u_x, d_l_y, d_u_y))
+                # print(" src  x=[%d %d] y=[%d %d]" % (s_l_x, s_u_x, s_l_y, s_u_y))
+                # src = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
+                # dst =      pred[0, d_l_x : d_u_x, d_l_y : d_u_y]
+                pred[0, d_l_x : d_u_x, d_l_y : d_u_y] = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
+                mv_iter.iternext()
                 iter_time.update(time.time() - st_i)
-            print(pred.shape)
             print("iter time %.10f" % iter_time.avg)
             print("loop time %.3f [%d]" % (time.time() - st_l, ctr))
             print("applied MVs to gen seg", iter)
