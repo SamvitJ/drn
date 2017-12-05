@@ -25,6 +25,7 @@ from torch.autograd import Variable
 import drn
 import data_transforms as transforms
 
+from first import first
 import pdb
 import pickle
 
@@ -423,28 +424,32 @@ def save_colorful_images(predictions, filenames, output_dir, palettes):
 def test(eval_data_loader, model, num_classes,
          output_dir='pred', has_gt=True, save_vis=False):
     model.eval()
+    hist = np.zeros((num_classes, num_classes))
+    prev_pred = ''
+    # load mvs
+    mv = pickle.load(open('moon_setting.pkl', 'rb'))
+    mv = np.transpose(mv, (0, 3, 1, 2))
+    # blow up mv array in x,y dim
+    image, label, name = first(eval_data_loader)
+    mv = np.repeat(mv, image.shape[2] / mv.shape[2], axis=2)
+    mv = np.repeat(mv, image.shape[3] / mv.shape[3], axis=3)
+    # pad mv array to image size
+    mvP = np.zeros((mv.shape[0], mv.shape[1], image.shape[2], image.shape[3]), dtype=mv.dtype)
+    mvP[:mv.shape[0], :mv.shape[1], :mv.shape[2], :mv.shape[3]] = mv
+    mv = mvP
+    # start timing
     batch_time = AverageMeter()
     data_time = AverageMeter()
     end = time.time()
-    hist = np.zeros((num_classes, num_classes))
-    prev_pred = ''
+    # pdb.set_trace()
     for iter, (image, label, name) in enumerate(eval_data_loader):
         data_time.update(time.time() - end)
-        if iter % 10 == 0:
+        if iter % 2 == 0:
             image_var = Variable(image, requires_grad=False, volatile=True)
             final = model(image_var)[0]
             _, pred = torch.max(final, 1)
             pred = pred.cpu().data.numpy()
         else:
-            mv = pickle.load(open('moon_setting.pkl', 'rb'))
-            mv = np.transpose(mv, (0, 3, 1, 2))
-            # blow up mv array in x,y dim
-            mv = np.repeat(mv, image.shape[2] / mv.shape[2], axis=2)
-            mv = np.repeat(mv, image.shape[3] / mv.shape[3], axis=3)
-            # pad mv array to image size
-            mvP = np.zeros((mv.shape[0], mv.shape[1], image.shape[2], image.shape[3]), dtype=mv.dtype)
-            mvP[:mv.shape[0], :mv.shape[1], :mv.shape[2], :mv.shape[3]] = mv
-            mv = mvP
             # init new pred array, iter
             pred = prev_pred.copy()
             it = np.nditer(pred, flags=['multi_index'], op_flags=['writeonly'])
@@ -462,18 +467,18 @@ def test(eval_data_loader, model, num_classes,
                 # enforce bounds on (new_x, new_y)
                 if new_x < 0:
                     new_x = 0
-                if new_x >= pred.shape[1]:
+                elif new_x >= pred.shape[1]:
                     new_x = pred.shape[1] - 1
                 if new_y < 0:
                     new_y = 0
-                if new_y >= pred.shape[2]:
+                elif new_y >= pred.shape[2]:
                     new_y = pred.shape[2] - 1
                 # set class at (x, y)
                 it[0] = prev_pred[0][new_x][new_y]
                 # print("(%d, %d) (%d, %d)" % (x, y, mv_x, mv_y))
                 # print("%d %d <%s>\n" % (prev_pred[0][x][y], it[0], it.multi_index))
                 it.iternext()
-            # pdb.set_trace()
+            print("applied MVs to gen seg", iter)
         batch_time.update(time.time() - end)
         if save_vis:
             save_output_images(pred, name, output_dir)
