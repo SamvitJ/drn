@@ -451,9 +451,16 @@ def test(eval_data_loader, model, num_classes,
             pred = pred.cpu().data.numpy()
         else:
             # init new pred array, iter
+            st_c = time.time()
             pred = prev_pred.copy()
+            print("copy time %.3f" % (time.time() - st_c))
             it = np.nditer(pred, flags=['multi_index'], op_flags=['writeonly'])
+            st_l = time.time()
+            ctr = 0
+            iter_time = AverageMeter()
             while not it.finished:
+                st_i = time.time()
+                ctr += 1
                 # get curr pos (x,y)
                 ind = it.multi_index
                 x = ind[1]
@@ -478,6 +485,10 @@ def test(eval_data_loader, model, num_classes,
                 # print("(%d, %d) (%d, %d)" % (x, y, mv_x, mv_y))
                 # print("%d %d <%s>\n" % (prev_pred[0][x][y], it[0], it.multi_index))
                 it.iternext()
+                iter_time.update(time.time() - st_i)
+            print(pred.shape)
+            print("iter time %.10f" % iter_time.avg)
+            print("loop time %.3f [%d]" % (time.time() - st_l, ctr))
             print("applied MVs to gen seg", iter)
         batch_time.update(time.time() - end)
         if save_vis:
