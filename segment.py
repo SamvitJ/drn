@@ -467,27 +467,27 @@ def test(eval_data_loader, model, num_classes,
                 # extract mv at (x,y)
                 mv_x = int(mv[iter - 1][0][x][y])
                 mv_y = int(mv[iter - 1][1][x][y])
-                # compute src class pos (new_x, new_y)
-                new_x = x - mv_x
-                new_y = y - mv_y
-                # enforce bounds on (new_x, new_y)
-                if new_x < 0:
-                    new_x = 0
-                elif new_x >= mv.shape[2]:
-                    new_x = mv.shape[2] - 1
-                if new_y < 0:
-                    new_y = 0
-                elif new_y >= mv.shape[3]:
-                    new_y = mv.shape[3] - 1
+                # compute src class pos (x_src, y_src)
+                x_src = x - mv_x
+                y_src = y - mv_y
+                # enforce bounds on (x_src, y_src)
+                if x_src < 0:
+                    x_src = 0
+                elif x_src >= mv.shape[2]:
+                    x_src = mv.shape[2] - 1
+                if y_src < 0:
+                    y_src = 0
+                elif y_src >= mv.shape[3]:
+                    y_src = mv.shape[3] - 1
                 # set class at (x, y)
                 d_l_x = r * x
                 d_u_x = r * (x+1)
                 d_l_y = r * y
                 d_u_y = r * (y+1)
-                s_l_x = r * new_x
-                s_u_x = r * (new_x+1)
-                s_l_y = r * new_y
-                s_u_y = r * (new_y+1)
+                s_l_x = r * x_src
+                s_u_x = r * (x_src+1)
+                s_l_y = r * y_src
+                s_u_y = r * (y_src+1)
                 # print("dest  x=[%d %d] y=[%d %d]" % (d_l_x, d_u_x, d_l_y, d_u_y))
                 # print(" src  x=[%d %d] y=[%d %d]" % (s_l_x, s_u_x, s_l_y, s_u_y))
                 # src = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
