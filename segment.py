@@ -441,7 +441,7 @@ def test(eval_data_loader, model, num_classes,
     # pdb.set_trace()
     for iter, (image, label, name) in enumerate(eval_data_loader):
         data_time.update(time.time() - end)
-        if iter % 2 == 0:
+        if iter % 2 == 0 or iter == mv.shape[0]:
             image_var = Variable(image, requires_grad=False, volatile=True)
             final = model(image_var)[0]
             _, pred = torch.max(final, 1)
@@ -453,7 +453,7 @@ def test(eval_data_loader, model, num_classes,
             st_c = time.time()
             pred = prev_pred.copy()
             print("copy time %.3f" % (time.time() - st_c))
-            mv_iter = np.nditer(mv[iter - 1][0], flags=['multi_index'], op_flags=['readonly'])
+            mv_iter = np.nditer(mv[iter][0], flags=['multi_index'], op_flags=['readonly'])
             st_l = time.time()
             ctr = 0
             iter_time = AverageMeter()
@@ -465,8 +465,8 @@ def test(eval_data_loader, model, num_classes,
                 x = ind[0]
                 y = ind[1]
                 # extract mv at (x,y)
-                mv_x = int(mv[iter - 1][0][x][y])
-                mv_y = int(mv[iter - 1][1][x][y])
+                mv_x = int(mv[iter][0][x][y])
+                mv_y = int(mv[iter][1][x][y])
                 # compute src class pos (x_src, y_src)
                 x_src = x - mv_x
                 y_src = y - mv_y
