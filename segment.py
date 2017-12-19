@@ -472,10 +472,10 @@ def test(eval_data_loader, model, num_classes,
                 d_u_x = r * (x+1)
                 d_l_y = r * y
                 d_u_y = r * (y+1)
-                s_l_x = d_l_x - mv_x
-                s_u_x = d_u_x - mv_x
-                s_l_y = d_l_y - mv_y
-                s_u_y = d_u_y - mv_y
+                s_l_x = d_l_x - mv_y
+                s_u_x = d_u_x - mv_y
+                s_l_y = d_l_y - mv_x
+                s_u_y = d_u_y - mv_x
                 # enforce bounds
                 # if s_l_x < 0 or s_u_x > pred.shape[1] or s_l_y < 0 or s_u_y > pred.shape[2]:
                 #     pdb.set_trace()
