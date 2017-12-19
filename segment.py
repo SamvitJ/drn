@@ -467,31 +467,38 @@ def test(eval_data_loader, model, num_classes,
                 # extract mv at (x,y)
                 mv_x = int(mv[iter][0][x][y])
                 mv_y = int(mv[iter][1][x][y])
-                # compute src class pos (x_src, y_src)
-                x_src = x - mv_x
-                y_src = y - mv_y
-                # enforce bounds on (x_src, y_src)
-                if x_src < 0:
-                    x_src = 0
-                elif x_src >= mv.shape[2]:
-                    x_src = mv.shape[2] - 1
-                if y_src < 0:
-                    y_src = 0
-                elif y_src >= mv.shape[3]:
-                    y_src = mv.shape[3] - 1
-                # set class at (x, y)
+                # set dst (d_*) + src (s_*) coords
                 d_l_x = r * x
                 d_u_x = r * (x+1)
                 d_l_y = r * y
                 d_u_y = r * (y+1)
-                s_l_x = r * x_src
-                s_u_x = r * (x_src+1)
-                s_l_y = r * y_src
-                s_u_y = r * (y_src+1)
+                s_l_x = d_l_x - mv_x
+                s_u_x = d_u_x - mv_x
+                s_l_y = d_l_y - mv_y
+                s_u_y = d_u_y - mv_y
+                # enforce bounds
+                # if s_l_x < 0 or s_u_x > pred.shape[1] or s_l_y < 0 or s_u_y > pred.shape[2]:
+                #     pdb.set_trace()
+                if s_l_x < 0:
+                    s_l_x = 0
+                    s_u_x = r
+                elif s_u_x > pred.shape[1]:
+                    s_u_x = pred.shape[1]
+                    s_l_x = s_u_x - r
+                if s_l_y < 0:
+                    s_l_y = 0
+                    s_u_y = r
+                elif s_u_y > pred.shape[2]:
+                    s_u_y = pred.shape[2]
+                    s_l_y = s_u_y - r
                 # print("dest  x=[%d %d] y=[%d %d]" % (d_l_x, d_u_x, d_l_y, d_u_y))
                 # print(" src  x=[%d %d] y=[%d %d]" % (s_l_x, s_u_x, s_l_y, s_u_y))
-                # src = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
-                # dst =      pred[0, d_l_x : d_u_x, d_l_y : d_u_y]
+                # assert shapes match
+                src = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
+                dst =      pred[0, d_l_x : d_u_x, d_l_y : d_u_y]
+                if src.shape != dst.shape:
+                    pdb.set_trace()
+                # set pixels
                 pred[0, d_l_x : d_u_x, d_l_y : d_u_y] = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
                 mv_iter.iternext()
                 iter_time.update(time.time() - st_i)
