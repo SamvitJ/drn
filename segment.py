@@ -427,7 +427,7 @@ def test(eval_data_loader, model, num_classes,
     hist = np.zeros((num_classes, num_classes))
     prev_pred = ''
     # load mvs
-    mv = pickle.load(open('frankfurt-1k.pkl', 'rb'))
+    mv = pickle.load(open('frankfurt-1k_12.pkl', 'rb'))
     mv = np.transpose(mv, (0, 3, 1, 2))
     # calc image:mv dim ratio
     image, _, _ = first(eval_data_loader)
