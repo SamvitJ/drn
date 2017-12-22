@@ -392,6 +392,21 @@ def per_class_iu(hist):
     return np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
 
 
+def load_output_images(filenames, output_dir):
+    """
+    Read a batch of image files into a (B x C x H x W) tensor.
+    """
+    pred = np.empty([])
+    for ind in range(len(filenames)):
+        fn = os.path.join(output_dir, filenames[ind])
+        arr = np.asarray(Image.open(fn))
+        if ind == 0:
+            pred = np.expand_dims(arr, axis=0)
+        else:
+            pred = np.append(pred, arr, axis=0)
+    return pred
+
+
 def save_output_images(predictions, filenames, output_dir):
     """
     Saves a given (B x C x H x W) into an image file.
@@ -422,7 +437,7 @@ def save_colorful_images(predictions, filenames, output_dir, palettes):
 
 
 def test(eval_data_loader, model, num_classes,
-         output_dir='pred', has_gt=True, save_vis=False):
+         output_dir='pred', has_gt=True, has_drn_pred=False, save_vis=False):
     model.eval()
     hist = np.zeros((num_classes, num_classes))
     prev_pred = ''
@@ -441,11 +456,13 @@ def test(eval_data_loader, model, num_classes,
     # pdb.set_trace()
     for iter, (image, label, name) in enumerate(eval_data_loader):
         data_time.update(time.time() - end)
+        ran_orig = True
         if iter % 2 == 0 or iter == mv.shape[0]:
             image_var = Variable(image, requires_grad=False, volatile=True)
             final = model(image_var)[0]
             _, pred = torch.max(final, 1)
             pred = pred.cpu().data.numpy()
+            ran_orig = True
             if iter == 0:
                 print(" pd.shape %s" % (pred.shape,))
         else:
@@ -502,6 +519,7 @@ def test(eval_data_loader, model, num_classes,
                 pred[0, d_l_x : d_u_x, d_l_y : d_u_y] = prev_pred[0, s_l_x : s_u_x, s_l_y : s_u_y]
                 mv_iter.iternext()
                 iter_time.update(time.time() - st_i)
+            ran_orig = False
             print("iter time %.10f" % iter_time.avg)
             print("loop time %.3f [%d]" % (time.time() - st_l, ctr))
             print("applied MVs to gen seg", iter)
@@ -515,6 +533,11 @@ def test(eval_data_loader, model, num_classes,
             hist += fast_hist(pred.flatten(), label.flatten(), num_classes)
             print('===> mAP {mAP:.3f}'.format(
                 mAP=round(np.nanmean(per_class_iu(hist)) * 100, 2)))
+        elif has_drn_pred and not ran_orig:
+            label = load_output_images(name, 'labels')
+            hist += fast_hist(pred.flatten(), label.flatten(), num_classes)
+            print('===> mAP {mAP:.3f}'.format(
+                mAP=round(np.nanmean(per_class_iu(hist)) * 100, 2)))
         end = time.time()
         prev_pred = pred
         print('Eval: [{0}/{1}]\t'
@@ -522,7 +545,7 @@ def test(eval_data_loader, model, num_classes,
               'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
               .format(iter, len(eval_data_loader), batch_time=batch_time,
                       data_time=data_time))
-    if has_gt: #val
+    if has_gt or has_drn_pred: #val
         ious = per_class_iu(hist) * 100
         print(' '.join('{:.03f}'.format(i) for i in ious))
         return round(np.nanmean(ious), 2)
@@ -572,6 +595,7 @@ def test_seg(args):
 
     mAP = test(test_loader, model, args.classes, save_vis=True,
                has_gt=phase != 'test',
+               has_drn_pred=True,
                output_dir='pred_{:03d}'.format(start_epoch))
     print('mAP: ', mAP)
 
