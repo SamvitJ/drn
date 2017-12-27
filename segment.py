@@ -400,8 +400,9 @@ def load_output_images(filenames, output_dir):
     for ind in range(len(filenames)):
         fn = os.path.join(output_dir, filenames[ind])
         arr = np.asarray(Image.open(fn))
+        arr = np.expand_dims(arr, axis=0)
         if ind == 0:
-            pred = np.expand_dims(arr, axis=0)
+            pred = arr
         else:
             pred = np.append(pred, arr, axis=0)
     return pred
